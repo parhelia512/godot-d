@@ -2,9 +2,9 @@
 Base class for all $(I scene) objects.
 
 Copyright:
-Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.  
-Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)  
-Copyright (c) 2017-2018 Godot-D contributors  
+Copyright (c) 2007-2018 Juan Linietsky, Ariel Manzur.
+Copyright (c) 2014-2018 Godot Engine contributors (cf. AUTHORS.md)
+Copyright (c) 2017-2018 Godot-D contributors
 
 License: $(LINK2 https://opensource.org/licenses/MIT, MIT License)
 
@@ -154,16 +154,16 @@ public:
 		@GodotName("set_scene_instance_load_placeholder") GodotMethod!(void, bool) setSceneInstanceLoadPlaceholder;
 		@GodotName("update_configuration_warning") GodotMethod!(void) updateConfigurationWarning;
 	}
-	/// 
+	///
 	pragma(inline, true) bool opEquals(in Node other) const
 	{ return _godot_object.ptr is other._godot_object.ptr; }
-	/// 
+	///
 	pragma(inline, true) typeof(null) opAssign(typeof(null) n)
 	{ _godot_object.ptr = n; return null; }
-	/// 
+	///
 	pragma(inline, true) bool opEquals(typeof(null) n) const
 	{ return _godot_object.ptr is n; }
-	/// 
+	///
 	size_t toHash() const @trusted { return cast(size_t)_godot_object.ptr; }
 	mixin baseCasts;
 	/// Construct a new instance of Node.
@@ -176,7 +176,13 @@ public:
 		return cast(Node)(constructor());
 	}
 	@disable new(size_t s);
-	/// 
+
+	pragma(inline, true) bool isInstanceValid() const
+	{
+		return _godot_api.godot_is_instance_valid(_godot_object);
+	}
+
+	///
 	enum PauseMode : int
 	{
 		/**
@@ -192,7 +198,7 @@ public:
 		*/
 		pauseModeProcess = 2,
 	}
-	/// 
+	///
 	enum DuplicateFlags : int
 	{
 		/**
@@ -213,7 +219,7 @@ public:
 		*/
 		duplicateUseInstancing = 8,
 	}
-	/// 
+	///
 	enum Constants : int
 	{
 		pauseModeInherit = 0,
@@ -394,7 +400,7 @@ public:
 		return this.callv(_GODOT_method_name, _GODOT_args).as!(RefOrT!String);
 	}
 	/**
-	
+
 	*/
 	String _getEditorDescription() const
 	{
@@ -403,7 +409,7 @@ public:
 		return this.callv(_GODOT_method_name, _GODOT_args).as!(RefOrT!String);
 	}
 	/**
-	
+
 	*/
 	NodePath _getImportPath() const
 	{
@@ -464,7 +470,7 @@ public:
 		this.callv(_GODOT_method_name, _GODOT_args);
 	}
 	/**
-	
+
 	*/
 	void _setEditorDescription(in String editor_description)
 	{
@@ -474,7 +480,7 @@ public:
 		this.callv(_GODOT_method_name, _GODOT_args);
 	}
 	/**
-	
+
 	*/
 	void _setImportPath(NodePathArg0)(in NodePathArg0 import_path)
 	{
@@ -515,13 +521,13 @@ public:
 	Adds a child node. Nodes can have any number of children, but every child must have a unique name. Child nodes are automatically deleted when the parent node is deleted, so an entire scene can be removed by deleting its topmost node.
 	If `legible_unique_name` is `true`, the child node will have a human-readable name based on the name of the node being instanced instead of its type.
 	$(B Note:) If the child node already has a parent, the function will fail. Use $(D removeChild) first to remove the node from its current parent. For example:
-	
-	
+
+
 	if child_node.get_parent():
 	    child_node.get_parent().remove_child(child_node)
 	add_child(child_node)
-	
-	
+
+
 	$(B Note:) If you want a child to be persisted to a $(D PackedScene), you must set $(D owner) in addition to calling $(D addChild). This is typically relevant for $(D url=https://godot.readthedocs.io/en/3.2/tutorials/misc/running_code_in_the_editor.html)tool scripts$(D /url) and $(D url=https://godot.readthedocs.io/en/latest/tutorials/plugins/editor/index.html)editor plugins$(D /url). If $(D addChild) is called without setting $(D owner), the newly added $(D Node) will not be visible in the scene tree, though it will be visible in the 2D/3D view.
 	*/
 	void addChild(Node node, in bool legible_unique_name = false)
@@ -612,7 +618,7 @@ public:
 		return ptrcall!(Array)(GDNativeClassBinding.getChildren, _godot_object);
 	}
 	/**
-	
+
 	*/
 	Ref!MultiplayerAPI getCustomMultiplayer() const
 	{
@@ -620,7 +626,7 @@ public:
 		return ptrcall!(MultiplayerAPI)(GDNativeClassBinding.getCustomMultiplayer, _godot_object);
 	}
 	/**
-	
+
 	*/
 	String getFilename() const
 	{
@@ -644,7 +650,7 @@ public:
 		return ptrcall!(long)(GDNativeClassBinding.getIndex, _godot_object);
 	}
 	/**
-	
+
 	*/
 	Ref!MultiplayerAPI getMultiplayer() const
 	{
@@ -652,7 +658,7 @@ public:
 		return ptrcall!(MultiplayerAPI)(GDNativeClassBinding.getMultiplayer, _godot_object);
 	}
 	/**
-	
+
 	*/
 	String getName() const
 	{
@@ -671,8 +677,8 @@ public:
 	Fetches a node. The $(D NodePath) can be either a relative path (from the current node) or an absolute path (in the scene tree) to a node. If the path does not exist, a `null instance` is returned and an error is logged. Attempts to access methods on the return value will result in an "Attempt to call &lt;method&gt; on a null instance." error.
 	$(B Note:) Fetching absolute paths only works when the node is inside the scene tree (see $(D isInsideTree)).
 	$(B Example:) Assume your current node is Character and the following tree:
-	
-	
+
+
 	/root
 	/root/Character
 	/root/Character/Sword
@@ -681,17 +687,17 @@ public:
 	/root/Swamp/Alligator
 	/root/Swamp/Mosquito
 	/root/Swamp/Goblin
-	
-	
+
+
 	Possible paths are:
-	
-	
+
+
 	get_node("Sword")
 	get_node("Backpack/Dagger")
 	get_node("../Swamp/Alligator")
 	get_node("/root/MyGame")
-	
-	
+
+
 	*/
 	Node getNode(NodePathArg0)(in NodePathArg0 path) const
 	{
@@ -702,13 +708,13 @@ public:
 	Fetches a node and one of its resources as specified by the $(D NodePath)'s subname (e.g. `Area2D/CollisionShape2D:shape`). If several nested resources are specified in the $(D NodePath), the last one will be fetched.
 	The return value is an array of size 3: the first index points to the $(D Node) (or `null` if not found), the second index points to the $(D Resource) (or `null` if not found), and the third index is the remaining $(D NodePath), if any.
 	For example, assuming that `Area2D/CollisionShape2D` is a valid node and that its `shape` property has been assigned a $(D RectangleShape2D) resource, one could have this kind of output:
-	
-	
+
+
 	print(get_node_and_resource("Area2D/CollisionShape2D")) # $(D [CollisionShape2D:1161), Null, ]
 	print(get_node_and_resource("Area2D/CollisionShape2D:shape")) # $(D [CollisionShape2D:1161), $(D RectangleShape2D:1156), ]
 	print(get_node_and_resource("Area2D/CollisionShape2D:shape:extents")) # $(D [CollisionShape2D:1161), $(D RectangleShape2D:1156), :extents]
-	
-	
+
+
 	*/
 	Array getNodeAndResource(NodePathArg0)(in NodePathArg0 path)
 	{
@@ -724,7 +730,7 @@ public:
 		return ptrcall!(Node)(GDNativeClassBinding.getNodeOrNull, _godot_object, path);
 	}
 	/**
-	
+
 	*/
 	Node getOwner() const
 	{
@@ -756,7 +762,7 @@ public:
 		return ptrcall!(NodePath)(GDNativeClassBinding.getPathTo, _godot_object, node);
 	}
 	/**
-	
+
 	*/
 	Node.PauseMode getPauseMode() const
 	{
@@ -788,7 +794,7 @@ public:
 		return ptrcall!(double)(GDNativeClassBinding.getProcessDeltaTime, _godot_object);
 	}
 	/**
-	
+
 	*/
 	long getProcessPriority() const
 	{
@@ -958,16 +964,16 @@ public:
 	/**
 	Prints the tree to stdout. Used mainly for debugging purposes. This version displays the path relative to the current node, and is good for copy/pasting into the $(D getNode) function.
 	$(B Example output:)
-	
-	
+
+
 	TheGame
 	TheGame/Menu
 	TheGame/Menu/Label
 	TheGame/Menu/Camera2D
 	TheGame/SplashScreen
 	TheGame/SplashScreen/Camera2D
-	
-	
+
+
 	*/
 	void printTree()
 	{
@@ -977,16 +983,16 @@ public:
 	/**
 	Similar to $(D printTree), this prints the tree to stdout. This version displays a more graphical representation similar to what is displayed in the scene inspector. It is useful for inspecting larger trees.
 	$(B Example output:)
-	
-	
+
+
 	 ┖╴TheGame
 	    ┠╴Menu
 	    ┃  ┠╴Label
 	    ┃  ┖╴Camera2D
 	    ┖╴SplashScreen
 	       ┖╴Camera2D
-	
-	
+
+
 	*/
 	void printTreePretty()
 	{
@@ -1174,7 +1180,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.rsetUnreliableId, _godot_object, peer_id, property, value);
 	}
 	/**
-	
+
 	*/
 	void setCustomMultiplayer(MultiplayerAPI api)
 	{
@@ -1190,7 +1196,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.setDisplayFolded, _godot_object, fold);
 	}
 	/**
-	
+
 	*/
 	void setFilename(in String filename)
 	{
@@ -1198,7 +1204,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.setFilename, _godot_object, filename);
 	}
 	/**
-	
+
 	*/
 	void setName(in String name)
 	{
@@ -1214,7 +1220,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.setNetworkMaster, _godot_object, id, recursive);
 	}
 	/**
-	
+
 	*/
 	void setOwner(Node owner)
 	{
@@ -1222,7 +1228,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.setOwner, _godot_object, owner);
 	}
 	/**
-	
+
 	*/
 	void setPauseMode(in long mode)
 	{
@@ -1272,7 +1278,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.setProcessInternal, _godot_object, enable);
 	}
 	/**
-	
+
 	*/
 	void setProcessPriority(in long priority)
 	{
@@ -1313,7 +1319,7 @@ public:
 		ptrcall!(void)(GDNativeClassBinding.updateConfigurationWarning, _godot_object);
 	}
 	/**
-	
+
 	*/
 	@property NodePath _importPath()
 	{
@@ -1337,7 +1343,7 @@ public:
 		setCustomMultiplayer(v);
 	}
 	/**
-	
+
 	*/
 	@property String editorDescription()
 	{
