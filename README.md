@@ -1,5 +1,8 @@
 [![Godot-D logo](/logo.png)](https://code.dlang.org/packages/godot-d)
 
+Fork of Godot-D release tag v0.1.14
+=======
+
 Godot-D
 =======
 D language bindings for the [Godot Engine](https://godotengine.org/)'s
@@ -66,15 +69,15 @@ import godot, godot.button;
 class TestButton : GodotScript!Button
 {
 	@Property(Property.Hint.range, "1,10") int number = 9;
-	
+
 	@Signal static void function(String message, int num) sendMessage;
-	
+
 	@Method void _pressed()
 	{
 		print("Button was pressed. `number` is currently ", number);
 		emitSignal("send_message", "`number` is currently ", number);
 	}
-	
+
 	...
 }
 ```
@@ -110,12 +113,12 @@ mixin GodotNativeLibrary!
 (
 	// your GDNativeLibrary resource's symbol_prefix
 	"platformer",
-	
+
 	// a list of all of your script classes
 	Player,
 	Enemy,
 	Level,
-	
+
 	// functions to call at initialization and termination (both optional)
 	(GodotInitOptions o){ writeln("Library initialized"); },
 	(GodotTerminateOptions o){ writeln("Library terminated"); }
