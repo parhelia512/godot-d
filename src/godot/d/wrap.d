@@ -15,6 +15,11 @@ import godot.d.traits, godot.d.script;
 import godot.core, godot.c;
 import godot.node;
 
+public void delegate(Throwable err) on_unhandled_exception = delegate(Throwable err) {
+	import std.stdio : stderr;
+	stderr.writeln(err);
+};
+
 private template staticCount(alias thing, seq...)
 {
 	template staticCountNum(size_t soFar, seq...)
@@ -45,9 +50,9 @@ package(godot) template godotMethods(T)
 	alias mfs(alias mName) = MemberFunctionsTuple!(T, mName);
 	alias allMfs = staticMap!(mfs, __traits(derivedMembers, T));
 	enum bool isMethod(alias mf) = hasUDA!(mf, Method);
-	
+
 	alias godotMethods = Filter!(isMethod, allMfs);
-	
+
 	alias godotNames = staticMap!(godotName, godotMethods);
 	static assert(godotNames.length == NoDuplicates!godotNames.length,
 		overloadError!godotMethods());
@@ -96,9 +101,9 @@ package(godot) template godotPropertyGetters(T)
 	{
 		enum bool isGetter = hasUDA!(mf, Property) && !is(ReturnType!mf == void);
 	}
-	
+
 	alias godotPropertyGetters = Filter!(isGetter, allMfs);
-	
+
 	alias godotNames = Filter!(godotName, godotPropertyGetters);
 	static assert(godotNames.length == NoDuplicates!godotNames.length,
 		overloadError!godotPropertyGetters());
@@ -112,9 +117,9 @@ package(godot) template godotPropertySetters(T)
 	{
 		enum bool isSetter = hasUDA!(mf, Property) && is(ReturnType!mf == void);
 	}
-	
+
 	alias godotPropertySetters = Filter!(isSetter, allMfs);
-	
+
 	alias godotNames = Filter!(godotName, godotPropertySetters);
 	static assert(godotNames.length == NoDuplicates!godotNames.length,
 		overloadError!godotPropertySetters());
@@ -136,7 +141,7 @@ package(godot) template godotPropertyVariableNames(T)
 			enum bool isVariable = hasUDA!(field!name, Property);
 		else enum bool isVariable = false;
 	}
-	
+
 	alias godotPropertyVariableNames = Filter!(isVariable, fieldNames);
 }
 
@@ -148,7 +153,7 @@ package(godot) template extractPropertyVariantType(seq...)
 		static if(isFunction!a && is(ReturnType!a == void)) alias Type = Parameters!a[0];
 		else static if(isFunction!a) alias Type = NonRef!(ReturnType!a);
 		//else alias Type = typeof(a);
-		
+
 		static assert(Variant.compatible!Type, "Property type "~
 			Type.stringof~" is incompatible with Variant.");
 	}
@@ -165,7 +170,7 @@ package(godot) template extractPropertyUDA(seq...)
 	}
 	enum bool isUDAValue(alias a) = !is(a);
 	alias values = Filter!(isUDAValue, staticMap!(udas, seq));
-	
+
 	static if(values.length == 0) enum Property extractPropertyUDA = Property.init;
 	else static if(values.length == 1) enum Property extractPropertyUDA = values[0];
 	else
@@ -188,9 +193,9 @@ package(godot) struct MethodWrapper(T, alias mf)
 {
 	alias R = ReturnType!mf; // the return type (can be void)
 	alias A = Parameters!mf; // the argument types (can be empty)
-	
+
 	enum string name = __traits(identifier, mf);
-	
+
 	/++
 	C function passed to Godot that calls the wrapped method
 	+/
@@ -200,13 +205,13 @@ package(godot) struct MethodWrapper(T, alias mf)
 	{
 		// TODO: check types for Variant compatibility, give a better error here
 		// TODO: check numArgs, accounting for D arg defaults
-		
+
 		godot_variant vd;
 		_godot_api.godot_variant_new_nil(&vd);
 		Variant* v = cast(Variant*)&vd; // just a pointer; no destructor will be called
-		
+
 		T obj = cast(T)userData;
-		
+
 		A[ai] variantToArg(size_t ai)()
 		{
 			return (cast(Variant*)args[ai]).as!(A[ai]);
@@ -215,22 +220,29 @@ package(godot) struct MethodWrapper(T, alias mf)
 		{
 			alias ArgCall = variantToArg!ai; //A[i] function()
 		}
-		
+
 		alias argIota = aliasSeqOf!(iota(A.length));
 		alias argCall = staticMap!(ArgCall, argIota);
-		
-		static if(is(R == void))
-		{
-			mixin("obj." ~ name ~ "(argCall);");
+
+		try {
+			static if(is(R == void))
+			{
+				mixin("obj." ~ name ~ "(argCall);");
+			}
+			else
+			{
+				mixin("*v = obj." ~ name ~ "(argCall);");
+			}
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
 		}
-		else
-		{
-			mixin("*v = obj." ~ name ~ "(argCall);");
-		}
-		
+
 		return vd;
 	}
-	
+
 	/++
 	C function passed to Godot if this is a property getter
 	+/
@@ -242,14 +254,21 @@ package(godot) struct MethodWrapper(T, alias mf)
 		godot_variant vd;
 		_godot_api.godot_variant_new_nil(&vd);
 		Variant* v = cast(Variant*)&vd; // just a pointer; no destructor will be called
-		
+
 		T obj = cast(T)userData;
-		
-		mixin("*v = obj." ~ name ~ "();");
-		
+
+		try {
+			mixin("*v = obj." ~ name ~ "();");
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
+		}
+
 		return vd;
 	}
-	
+
 	/++
 	C function passed to Godot if this is a property setter
 	+/
@@ -259,11 +278,18 @@ package(godot) struct MethodWrapper(T, alias mf)
 		void* userData, godot_variant* arg)
 	{
 		Variant* v = cast(Variant*)arg;
-		
+
 		T obj = cast(T)userData;
-		
+
 		auto vt = v.as!(A[0]);
-		mixin("obj." ~ name ~ "(vt);");
+		try {
+			mixin("obj." ~ name ~ "(vt);");
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
+		}
 	}
 }
 
@@ -274,15 +300,15 @@ package(godot) struct OnReadyWrapper(T) if(is(GodotClass!T : Node))
 		void* userData, int numArgs, godot_variant** args)
 	{
 		T t = cast(T)userData;
-		
+
 		foreach(n; onReadyFieldNames!T)
 		{
 			alias udas = getUDAs!(__traits(getMember, T, n), OnReady);
 			static assert(udas.length == 1, "Multiple OnReady UDAs on "~T.stringof~"."~n);
-			
+
 			alias A = Alias!(TemplateArgsOf!(udas[0])[0]);
 			alias F = typeof(mixin("T."~n));
-			
+
 			// First, determine where to obtain the value to assign, and put it in `result`.
 			// `result` will be alias to void if nothing to assign.
 			static if(isCallable!A)
@@ -318,43 +344,57 @@ package(godot) struct OnReadyWrapper(T) if(is(GodotClass!T : Node))
 				}
 				else alias result = A; // final fallback: pass it unmodified to assignment
 			}
-			
+
 			// Second, assign `result` to the field depending on the types of it and `result`
 			static if(!is(result == void))
 			{
 				import godot.resource;
-				
-				static if(isImplicitlyConvertible!(typeof(result), F))
-				{
-					// direct assignment
-					mixin("t."~n) = result;
+
+				try {
+					static if(isImplicitlyConvertible!(typeof(result), F))
+					{
+						// direct assignment
+						mixin("t."~n) = result;
+					}
+					else static if(__traits(compiles, mixin("t."~n) = F(result)))
+					{
+						// explicit constructor (String(string), NodePath(string), etc)
+						mixin("t."~n) = F(result);
+					}
+					else static if(isGodotClass!F && extends!(F, Node))
+					{
+						// special case: node path
+						mixin("t."~n) = cast(F)t.owner.getNode(result);
+					}
+					else static if(isGodotClass!F && extends!(F, Resource))
+					{
+						// special case: resource load path
+						import godot.resourceloader;
+						mixin("t."~n) = cast(F)ResourceLoader.load(result);
+					}
+					else static assert(0, "Don't know how to assign "~typeof(result).stringof~" "~result.stringof~
+						" to "~F.stringof~" "~fullyQualifiedName!(mixin("t."~n)));
+				// Handle unhandled exception
+				} catch (Throwable err) {
+					if (on_unhandled_exception) {
+						on_unhandled_exception(err);
+					}
 				}
-				else static if(__traits(compiles, mixin("t."~n) = F(result)))
-				{
-					// explicit constructor (String(string), NodePath(string), etc)
-					mixin("t."~n) = F(result);
-				}
-				else static if(isGodotClass!F && extends!(F, Node))
-				{
-					// special case: node path
-					mixin("t."~n) = cast(F)t.owner.getNode(result);
-				}
-				else static if(isGodotClass!F && extends!(F, Resource))
-				{
-					// special case: resource load path
-					import godot.resourceloader;
-					mixin("t."~n) = cast(F)ResourceLoader.load(result);
-				}
-				else static assert(0, "Don't know how to assign "~typeof(result).stringof~" "~result.stringof~
-					" to "~F.stringof~" "~fullyQualifiedName!(mixin("t."~n)));
 			}
 		}
-		
+
 		// Finally, call the actual _ready() if it exists.
 		enum bool isReady(alias func) = "_ready" == godotName!func;
 		alias readies = Filter!(isReady, godotMethods!T);
-		static if(readies.length) mixin("t."~__traits(identifier, readies[0])~"();");
-		
+		try {
+			static if(readies.length) mixin("t."~__traits(identifier, readies[0])~"();");
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
+		}
+
 		godot_variant nil;
 		_godot_api.godot_variant_new_nil(&nil);
 		return nil;
@@ -375,32 +415,46 @@ package(godot) struct VariableWrapper(T, string var)
 	static if(extends!(P, Reference)) static assert(is(P : Ref!U, U),
 		"Reference type property "~T.stringof~"."~var~" must be ref-counted as Ref!("
 		~P.stringof~")");
-	
+
 	extern(C) // for calling convention
 	static godot_variant callPropertyGet(godot_object o, void* methodData,
 		void* userData)
 	{
 		T obj = cast(T)userData;
-		
+
 		godot_variant vd;
 		_godot_api.godot_variant_new_nil(&vd);
 		Variant* v = cast(Variant*)&vd; // just a pointer; no destructor will be called
-		
-		*v = mixin("obj."~var);
-		
+
+		try {
+			*v = mixin("obj."~var);
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
+		}
+
 		return vd;
 	}
-	
+
 	extern(C) // for calling convention
 	static void callPropertySet(godot_object o, void* methodData,
 		void* userData, godot_variant* arg)
 	{
 		T obj = cast(T)userData;
-		
+
 		Variant* v = cast(Variant*)arg;
-		
+
 		auto vt = v.as!P;
-		mixin("obj."~var) = vt;
+		try {
+			mixin("obj."~var) = vt;
+		// Handle unhandled exception
+		} catch (Throwable err) {
+			if (on_unhandled_exception) {
+				on_unhandled_exception(err);
+			}
+		}
 	}
 }
 
@@ -419,4 +473,3 @@ extern(C) package(godot) godot_variant emptyGetter(godot_object self, void* meth
 	_godot_api.godot_variant_new_nil(&v);
 	return v;+/
 }
-
